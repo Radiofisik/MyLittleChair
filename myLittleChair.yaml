@@ -1,0 +1,283 @@
+esphome:
+  name: ble
+  friendly_name: ble
+
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+  logs:
+    api:            DEBUG
+    button:         NONE
+    switch:         DEBUG
+    sensor:         NONE
+    number:         NONE
+    light:          NONE
+    text_sensor:    NONE
+#  level: DEBUG
+  baud_rate: 0
+
+substitutions:
+  chair_mac: 7F:F9:1A:51:4B:F9
+  chair_name_prefix: my
+  chair_id_prefix: my
+  chair_service_uuid: 0000FFB0-0000-1000-8000-00805F9B34FB
+  chair_rx_characteristic_uuid: 0000FFB1-0000-1000-8000-00805F9B34FB  # WRITE
+  chair_tx_characteristic_uuid: 0000FFB2-0000-1000-8000-00805F9B34FB # NOTIFY
+  chair_update_interval: '2000'  
+
+
+esp32_ble_tracker:
+  # scan_parameters:
+  #   interval: 1100ms
+  #   window: 1100ms
+  #   active: true
+
+
+switch:
+  - platform: template
+    # id: switch_${chair_id_prefix}_power
+    name: ${chair_name_prefix} Power
+    optimistic: true
+    icon: mdi:power-cycle
+    turn_on_action:
+      then:
+       - ble_client.ble_write:
+          id: ble_client_${chair_id_prefix}  
+          service_uuid: ${chair_service_uuid}
+          characteristic_uuid: ${chair_rx_characteristic_uuid}
+          value: [0xAE, 0x01, 0x01, 0x08, 0x01, 0x01, 0xBA, 0xC9]
+
+    turn_off_action:
+      then:
+       - ble_client.ble_write:
+          id: ble_client_${chair_id_prefix}  
+          service_uuid: ${chair_service_uuid}
+          characteristic_uuid: ${chair_rx_characteristic_uuid}
+          value: [0xAE, 0x01, 0x01, 0x08, 0x01, 0x01, 0xBA, 0xC9]
+
+number:
+  - platform: template
+    name: swing
+    id: swing
+    min_value: 0
+    max_value: 8
+    step: 1
+    optimistic: true
+
+  - platform: template
+    name: Volume
+    id: volume
+    icon: mdi:icon-volume-up
+    min_value: 0
+    max_value: 8
+    step: 1
+    optimistic: true  
+    on_value:
+      then:
+       - ble_client.ble_write:
+            id: ble_client_${chair_id_prefix}  
+            service_uuid: ${chair_service_uuid}
+            characteristic_uuid: ${chair_rx_characteristic_uuid}
+             # A lambda returning an std::vector<uint8_t>.
+            value: !lambda |-
+            
+              ESP_LOGD("myChair", "NOTIFY: %d", (byte)x);
+              std::vector<unsigned char> bArr = {0xAE, 0x01, 0x0F, 0x08, 0x01, (unsigned char)x, 0xC7, 0xC9};
+              int i = 6;
+              int i2 = 0;
+              for (int i3 = 0; i3 < i; i3++)
+              {
+                  i2 += bArr[i3];
+              }
+              if (i2 > 255)
+              {
+                  i2 = (~i2) + 1;
+              }
+              unsigned char cs = (unsigned char)(255 & i2);
+              bArr[6] = cs;
+              
+              return bArr;
+
+button:
+  - platform: template
+    name: "Swing Up"
+    id: button_up
+    icon: mdi:swipe_up
+    on_press:
+      then:
+        - number.increment:
+            id: swing
+            cycle: false
+        - ble_client.ble_write:
+            id: ble_client_${chair_id_prefix}  
+            service_uuid: ${chair_service_uuid}
+            characteristic_uuid: ${chair_rx_characteristic_uuid}
+            value: [0xAE, 0x01, 0x0E, 0x08, 0x01, 0x01, 0xC7, 0xC9]    
+
+  - platform: template
+    name: "Swing down"
+    icon: mdi:swipe_left
+    id: button_down
+    on_press:
+        then:
+          - number.decrement:
+              id: swing
+              cycle: false
+          - ble_client.ble_write:
+              id: ble_client_${chair_id_prefix}  
+              service_uuid: ${chair_service_uuid}
+              characteristic_uuid: ${chair_rx_characteristic_uuid}
+              value: [0xAE, 0x01, 0x0E, 0x08, 0x01, 0x02, 0xC8, 0xC9]   
+
+  - platform: template
+    name: "playin"
+    id: button_playIn
+    on_press:
+          then:
+            - ble_client.ble_write:
+                id: ble_client_${chair_id_prefix}  
+                service_uuid: ${chair_service_uuid}
+                characteristic_uuid: ${chair_rx_characteristic_uuid}
+                value: [0xAE, 0x01, 0x05, 0x08, 0x01, 0x01, 0xBE, 0xC9]   
+
+  - platform: template
+    name: "nextPiece"
+    icon: mdi:skip_next
+    id: button_nextPiece
+    on_press:
+          then:
+            - ble_client.ble_write:
+                id: ble_client_${chair_id_prefix}  
+                service_uuid: ${chair_service_uuid}
+                characteristic_uuid: ${chair_rx_characteristic_uuid}
+                value: [0xAE, 0x01, 0x05, 0x08, 0x01, 0x01, 0xBE, 0xC9]   
+
+  - platform: template
+    name: "Pause"
+    icon: mdi:pause
+    id: button_pause
+    on_press:
+          then:
+            - ble_client.ble_write:
+                id: ble_client_${chair_id_prefix}  
+                service_uuid: ${chair_service_uuid}
+                characteristic_uuid: ${chair_rx_characteristic_uuid}
+                value: [0xAE, 0x01, 0x07, 0x08, 0x01, 0x01, 0xC0, 0xC9]   
+
+  - platform: template
+    name: "PreviousPiece"
+    icon: mdi:skip_previous
+    id: button_previous
+    on_press:
+          then:
+            - ble_client.ble_write:
+                id: ble_client_${chair_id_prefix}  
+                service_uuid: ${chair_service_uuid}
+                characteristic_uuid: ${chair_rx_characteristic_uuid}
+                value: [0xAE, 0x01, 0x06, 0x08, 0x01, 0x01, 0xBF, 0xC9]   
+
+
+  - platform: template
+    name: "addVoice"
+    id: button_addVoice
+    icon: mdi:volume-plus
+    on_press:
+          then:
+            - ble_client.ble_write:
+                id: ble_client_${chair_id_prefix}  
+                service_uuid: ${chair_service_uuid}
+                characteristic_uuid: ${chair_rx_characteristic_uuid}
+                value: [0xAE, 0x01, 0x09, 0x08, 0x01, 0x01, 0xC2, 0xC9]   
+            - number.increment:
+                id: volume
+                cycle: false
+
+  - platform: template
+    name: "reduceVoice"
+    id: button_reduceVoice
+    icon: mdi:volume-minus
+    on_press:
+          then:
+            - ble_client.ble_write:
+                id: ble_client_${chair_id_prefix}  
+                service_uuid: ${chair_service_uuid}
+                characteristic_uuid: ${chair_rx_characteristic_uuid}
+                value: [0xAE, 0x01, 0x0A, 0x08, 0x01, 0x01, 0xC3, 0xC9]   
+            - number.decrement:
+                id: volume
+                cycle: false
+
+  - platform: template
+    name: "change"
+    id: button_change
+    icon: mdi:swap-horizontal
+    on_press:
+          then:
+            - ble_client.ble_write:
+                id: ble_client_${chair_id_prefix}  
+                service_uuid: ${chair_service_uuid}
+                characteristic_uuid: ${chair_rx_characteristic_uuid}
+                value: [0xAE, 0x01, 0x02, 0x08, 0x01, 0x01, 0xBB, 0xC9]   
+
+  - platform: template
+    name: "playNormal"
+    id: button_playNormal
+    on_press:
+          then:
+            - ble_client.ble_write:
+                id: ble_client_${chair_id_prefix}  
+                service_uuid: ${chair_service_uuid}
+                characteristic_uuid: ${chair_rx_characteristic_uuid}
+                value: [0xAE, 0x01, 0x05, 0x08, 0x01, 0x02, 0xBF, 0xC9]  
+
+  - platform: template
+    name: "playBle"
+    id: button_playBle
+    on_press:
+          then:
+            - ble_client.ble_write:
+                id: ble_client_${chair_id_prefix}  
+                service_uuid: ${chair_service_uuid}
+                characteristic_uuid: ${chair_rx_characteristic_uuid}
+                value: [0xAE, 0x01, 0x05, 0x08, 0x01, 0x03, 0xC0, 0xC9]  
+
+                
+                
+
+ble_client:
+    mac_address: ${chair_mac}
+    id: ble_client_${chair_id_prefix}  
+    name: chair_client
+
+text_sensor:
+  - platform: ble_client
+    id: text_sensor_${chair_id_prefix}
+    internal: true
+    ble_client_id: ble_client_${chair_id_prefix}
+    service_uuid: ${chair_service_uuid}
+    characteristic_uuid: ${chair_tx_characteristic_uuid}
+    notify: true
+    update_interval: never
+    on_notify:
+      then:
+        lambda: |-
+          static unsigned char packet[20];
+          ESP_LOGD("${chair_name_prefix}", "NOTIFY: %s", format_hex_pretty((uint8_t *) x.c_str(), x.size()).c_str());
+
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "vQPbq95mooy/iShrgu9aMckEt7S2Y71je3bXxEfePNg="
+
+ota:
+  password: "f333333333306f2bf5ef36"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
