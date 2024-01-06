@@ -40,7 +40,7 @@ esp32_ble_tracker:
 
 switch:
   - platform: template
-    # id: switch_${chair_id_prefix}_power
+    id: switch_${chair_id_prefix}_power
     name: ${chair_name_prefix} Power
     optimistic: true
     icon: mdi:power-cycle
@@ -268,6 +268,9 @@ text_sensor:
         lambda: |-
           static unsigned char packet[20];
           ESP_LOGD("${chair_name_prefix}", "NOTIFY: %s", format_hex_pretty((uint8_t *) x.c_str(), x.size()).c_str());
+          memcpy(&packet[0], x.c_str(), x.size());
+          id(swing).publish_state((float) packet[8]);
+          id(switch_${chair_id_prefix}_power).publish_state((int) packet[5] > 0);
 
 
 # Enable Home Assistant API
